@@ -41,9 +41,9 @@ foreach(_lib ${K4A_LIBS})
     endif()
 endforeach()
 
-message("K4A Libs: ${K4A_LIBS}")
-message("K4A DLLs: ${K4A_DLL_FILES}")
-message("K4A Install Needed: ${K4A_INSTALL_NEEDED}")
+message(VERBOSE "K4A Libs: ${K4A_LIBS}")
+message(VERBOSE "K4A DLLs: ${K4A_DLL_FILES}")
+message(VERBOSE "K4A Install Needed: ${K4A_INSTALL_NEEDED}")
 
 if (${K4A_INSTALL_NEEDED})
   # Tell cmake that we need to reconfigure if any of the DLL files change

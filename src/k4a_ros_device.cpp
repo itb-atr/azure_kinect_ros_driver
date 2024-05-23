@@ -14,7 +14,7 @@
 // Library headers
 //
 #include <angles/angles.h>
-#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.hpp>
 #include <k4a/k4a.h>
 #include <sensor_msgs/distortion_models.hpp>
 #include <sensor_msgs/image_encodings.hpp>
@@ -58,6 +58,7 @@ K4AROSDevice::K4AROSDevice()
   static const std::string compressed_png_level = "/compressed/png_level";
 
   // Declare node parameters
+  this->declare_parameter("tf_prefix", rclcpp::ParameterValue(""));
   this->declare_parameter("depth_enabled", rclcpp::ParameterValue(true));
   this->declare_parameter("depth_mode", rclcpp::ParameterValue("NFOV_UNBINNED"));
   this->declare_parameter("color_enabled", rclcpp::ParameterValue(false));
@@ -174,6 +175,7 @@ K4AROSDevice::K4AROSDevice()
 
     if (params_.sensor_sn != "")
     {
+      params_.sensor_sn =  params_.sensor_sn .erase(0,3);
       RCLCPP_INFO_STREAM(this->get_logger(),"Searching for sensor with serial number: " << params_.sensor_sn);
     }
     else
@@ -768,7 +770,7 @@ k4a_result_t K4AROSDevice::getBodyMarker(const k4abt_body_t& body, std::shared_p
 
   // Set the lifetime to 0.25 to prevent flickering for even 5fps configurations.
   // New markers with the same ID will replace old markers as soon as they arrive.
-  marker_msg->lifetime = rclcpp::Duration(0.25);
+  marker_msg->lifetime = rclcpp::Duration(rclcpp::Duration::from_seconds(0.25));
   marker_msg->id = body.id * 100 + jointType;
   marker_msg->type = Marker::SPHERE;
 
@@ -878,9 +880,10 @@ void K4AROSDevice::framePublisherThread()
     {
       if (!k4a_device_.get_capture(&capture, waitTime))
       {
-        RCLCPP_FATAL(this->get_logger(),"Failed to poll cameras: node cannot continue.");
-        rclcpp::shutdown();
-        return;
+        RCLCPP_DEBUG(this->get_logger(),"Failed to poll cameras: node cannot continue.");
+        continue;
+//        rclcpp::shutdown();
+//        return;
       }
       else
       {
@@ -1434,7 +1437,7 @@ void K4AROSDevice::initializeTimestampOffset(const std::chrono::microseconds& k4
 
   device_to_realtime_offset_ = realtime_clock - k4a_device_timestamp_us;
 
-  RCLCPP_WARN_STREAM(this->get_logger(), "Initializing the device to realtime offset based on wall clock: "
+  RCLCPP_DEBUG_STREAM(this->get_logger(), "Initializing the device to realtime offset based on wall clock: "
                   << device_to_realtime_offset_.count() << " ns");
 }
 
@@ -1459,7 +1462,7 @@ void K4AROSDevice::updateTimestampOffset(const std::chrono::microseconds& k4a_de
   if (device_to_realtime_offset_.count() == 0 ||
       std::abs((device_to_realtime_offset_ - device_to_realtime).count()) > 1e7)
   {
-    RCLCPP_WARN_STREAM(this->get_logger(), "Initializing or re-initializing the device to realtime offset: " << device_to_realtime.count()
+    RCLCPP_DEBUG_STREAM(this->get_logger(), "Initializing or re-initializing the device to realtime offset: " << device_to_realtime.count()
                                                                                       << " ns");
     device_to_realtime_offset_ = device_to_realtime;
   }

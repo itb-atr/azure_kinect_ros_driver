@@ -95,6 +95,7 @@ int K4ACalibrationTransformData::getColorHeight()
 
 void K4ACalibrationTransformData::print()
 {
+  return;
   RCLCPP_INFO(this->get_logger(),"K4A Calibration Blob:");
   RCLCPP_INFO(this->get_logger(),"\t Depth:");
   printCameraCalibration(k4a_calibration_.depth_camera_calibration);

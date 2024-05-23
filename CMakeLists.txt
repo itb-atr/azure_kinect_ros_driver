@@ -9,13 +9,14 @@ list(INSERT CMAKE_MODULE_PATH 0 ${CMAKE_CURRENT_LIST_DIR}/cmake)
 if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD 14)
 endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 
 if(MSVC)
-  add_compile_options(/wd4251)
   # WORKAROUND: warning C4251: 'cv_bridge::CvImage::tracked_object_': class 'std::shared_ptr<const void>' needs to have dll-interface to be used by clients of class 'cv_bridge::CvImage'
+  add_compile_options(/wd4251)
 endif()
 
 ## Find packages
@@ -67,7 +68,7 @@ set_target_properties(${PROJECT_NAME}_node PROPERTIES OUTPUT_NAME node PREFIX ""
 #### AZURE KINECT SDK ######
 ############################
 
-message("Finding K4A SDK binaries")
+message(VERBOSE "Finding K4A SDK binaries")
 
 # Disable cached locations for K4A SDK binaries.
 # Do this to force the search logic to happen correctly.
@@ -86,10 +87,10 @@ set(K4A_LIBS k4a::k4a;k4a::k4arecord)
 find_package(k4abt 1.0.0 QUIET MODULE)
 if (k4abt_FOUND)
   list(APPEND K4A_LIBS k4abt::k4abt)
-  message(STATUS "Body Tracking SDK found: compiling support for Body Tracking")
+  message(VERBOSE "Body Tracking SDK found: compiling support for Body Tracking")
   target_compile_definitions(${PROJECT_NAME}_node PUBLIC K4A_BODY_TRACKING)
 else()
-  message("!!! Body Tracking SDK not found: body tracking features will not be available !!!")
+  message(VERBOSE "!!! Body Tracking SDK not found: body tracking features will not be available !!!")
 endif()
 
 # This reads the K4A_LIBS and K4A_INSTALL_REQUIRED variables and decides how to install
@@ -113,11 +114,11 @@ target_link_libraries(${PROJECT_NAME}_node
 # See http://ros.org/doc/api/catkin/html/adv_user_guide/variables.html
 
 ## Mark executables and/or libraries for installation
-install(TARGETS ${PROJECT_NAME}_node
-  ARCHIVE DESTINATION lib
-  LIBRARY DESTINATION lib
-  RUNTIME DESTINATION bin
-  DESTINATION lib/${PROJECT_NAME}
+install(
+  TARGETS ${PROJECT_NAME}_node
+  ARCHIVE DESTINATION lib/${PROJECT_NAME}
+  LIBRARY DESTINATION lib/${PROJECT_NAME}
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
 
 ## Mark other files for installation (e.g. launch and bag files, etc.)
