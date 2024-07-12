@@ -34,6 +34,9 @@
 #include "azure_kinect_ros_driver/k4a_calibration_transform_data.h"
 #include "azure_kinect_ros_driver/k4a_ros_device_params.h"
 
+#include <iostream>
+#include <fstream>
+
 class K4AROSDevice : public rclcpp::Node
 {
  public:
@@ -174,6 +177,10 @@ class K4AROSDevice : public rclcpp::Node
   // Threads
   std::thread frame_publisher_thread_;
   std::thread imu_publisher_thread_;
+
+  uint64_t frame_counter_;
+  std::ofstream legacy_log_stream_;
+  std::map<int, std::string> confidence_level_map_;
 };
 
 #endif  // K4A_ROS_DEVICE_H

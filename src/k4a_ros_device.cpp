@@ -25,6 +25,8 @@
 //
 #include "azure_kinect_ros_driver/k4a_ros_types.h"
 
+#include <ctime>
+
 using namespace rclcpp;
 using namespace sensor_msgs::msg;
 using namespace image_transport;
@@ -60,6 +62,7 @@ K4AROSDevice::K4AROSDevice()
   // Declare node parameters
   this->declare_parameter("tf_prefix", rclcpp::ParameterValue(""));
   this->declare_parameter("depth_enabled", rclcpp::ParameterValue(true));
+  this->declare_parameter("save_legacy_log", rclcpp::ParameterValue(true));
   this->declare_parameter("depth_mode", rclcpp::ParameterValue("NFOV_UNBINNED"));
   this->declare_parameter("color_enabled", rclcpp::ParameterValue(false));
   this->declare_parameter("color_format", rclcpp::ParameterValue("bgra"));
@@ -71,7 +74,7 @@ K4AROSDevice::K4AROSDevice()
   this->declare_parameter("sensor_sn", rclcpp::ParameterValue(""));
   this->declare_parameter("recording_file", rclcpp::ParameterValue(""));
   this->declare_parameter("recording_loop_enabled", rclcpp::ParameterValue(false));
-  this->declare_parameter("body_tracking_enabled", rclcpp::ParameterValue(false));
+  this->declare_parameter("body_tracking_enabled", rclcpp::ParameterValue(true));
   this->declare_parameter("body_tracking_smoothing_factor", rclcpp::ParameterValue(0.0f));
   this->declare_parameter("rescale_ir_to_mono8", rclcpp::ParameterValue(false));
   this->declare_parameter("ir_mono8_scaling_factor", rclcpp::ParameterValue(1.0f));
@@ -276,11 +279,47 @@ K4AROSDevice::K4AROSDevice()
 
 #if defined(K4A_BODY_TRACKING)
   if (params_.body_tracking_enabled) {
+    RCLCPP_INFO(this->get_logger(),"Body-Tracking enabled");
     body_marker_publisher_ = this->create_publisher<MarkerArray>("body_tracking_data", 1);
 
     body_index_map_publisher_ = image_transport::create_publisher(this,"body_index_map/image_raw");
   }
 #endif
+
+  if (params_.save_legacy_log && !params_.body_tracking_enabled)
+  {
+    RCLCPP_WARN(this->get_logger(),"Without enabled body tracking no Legacy Logging");
+  }
+  frame_counter_ = 0;
+  if (params_.save_legacy_log && params_.body_tracking_enabled)
+  {
+    std::string log_path = std::string("/tmp/") + params_.tf_prefix.substr(0, params_.tf_prefix.size()-1) + std::string("_legacy_log_") + std::to_string(duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) + ".csv";
+
+    RCLCPP_INFO(this->get_logger(),"Legacy Logging to file: %s", log_path.c_str());
+    legacy_log_stream_.open(log_path);
+    legacy_log_stream_ << "Person_ID,DeviceTimestamp,SystemTime,FrameCount,Pelvis_X,Pelvis_Y,Pelvis_Z," <<
+                          "Pelvis_Confident,SpineNavel_X,SpineNavel_Y,SpineNavel_Z,SpineNavel_Confident," <<
+                          "SpineChest_X,SpineChest_Y,SpineChest_Z,SpineChest_Confident,Neck_X,Neck_Y,Neck_Z," <<
+                          "Neck_Confident,ClavicleLeft_X,ClavicleLeft_Y,ClavicleLeft_Z,ClavicleLeft_Confident," <<
+                          "ShoulderLeft_X,ShoulderLeft_Y,ShoulderLeft_Z,ShoulderLeft_Confident,ElbowLeft_X," <<
+                          "ElbowLeft_Y,ElbowLeft_Z,ElbowLeft_Confident,WristLeft_X,WristLeft_Y,WristLeft_Z," <<
+                          "WristLeft_Confident,HandLeft_X,HandLeft_Y,HandLeft_Z,HandLeft_Confident,HandTipLeft_X," <<
+                          "HandTipLeft_Y,HandTipLeft_Z,HandTipLeft_Confident,ThumbLeft_X,ThumbLeft_Y,ThumbLeft_Z," <<
+                          "ThumbLeft_Confident,ClavicleRight_X,ClavicleRight_Y,ClavicleRight_Z,ClavicleRight_Confident," <<
+                          "ShoulderRight_X,ShoulderRight_Y,ShoulderRight_Z,ShoulderRight_Confident,ElbowRight_X," <<
+                          "ElbowRight_Y,ElbowRight_Z,ElbowRight_Confident,WristRight_X,WristRight_Y,WristRight_Z," <<
+                          "WristRight_Confident,HandRight_X,HandRight_Y,HandRight_Z,HandRight_Confident,HandTipRight_X," <<
+                          "HandTipRight_Y,HandTipRight_Z,HandTipRight_Confident,ThumbRight_X,ThumbRight_Y,ThumbRight_Z," <<
+                          "ThumbRight_Confident,HipLeft_X,HipLeft_Y,HipLeft_Z,HipLeft_Confident,KneeLeft_X,KneeLeft_Y," <<
+                          "KneeLeft_Z,KneeLeft_Confident,AnkleLeft_X,AnkleLeft_Y,AnkleLeft_Z,AnkleLeft_Confident," <<
+                          "FootLeft_X,FootLeft_Y,FootLeft_Z,FootLeft_Confident,HipRight_X,HipRight_Y,HipRight_Z," <<
+                          "HipRight_Confident,KneeRight_X,KneeRight_Y,KneeRight_Z,KneeRight_Confident,AnkleRight_X," <<
+                          "AnkleRight_Y,AnkleRight_Z,AnkleRight_Confident,FootRight_X,FootRight_Y,FootRight_Z," <<
+                          "FootRight_Confident,Head_X,Head_Y,Head_Z,Head_Confident,Nose_X,Nose_Y,Nose_Z,Nose_Confident," <<
+                          "EyeLeft_X,EyeLeft_Y,EyeLeft_Z,EyeLeft_Confident,EarLeft_X,EarLeft_Y,EarLeft_Z,EarLeft_Confident," <<
+                          "EyeRight_X,EyeRight_Y,EyeRight_Z,EyeRight_Confident,EarRight_X,EarRight_Y,EarRight_Z,EarRight_Confident\n";
+  confidence_level_map_ = {{0, "None"}, {1, "Low"}, {2, "Medium"}, {3, "High"}};
+  }
 }
 
 K4AROSDevice::~K4AROSDevice()
@@ -319,6 +358,11 @@ K4AROSDevice::~K4AROSDevice()
     k4abt_tracker_.shutdown();
   }
 #endif
+
+  if (params_.save_legacy_log)
+  {
+    legacy_log_stream_.close();
+  }
 }
 
 k4a_result_t K4AROSDevice::startCameras()
@@ -1032,8 +1076,7 @@ void K4AROSDevice::framePublisherThread()
 
 #if defined(K4A_BODY_TRACKING)
         // Publish body markers when body tracking is enabled and a depth image is available
-        if (params_.body_tracking_enabled && k4abt_tracker_queue_size_ < 3 &&
-            (this->count_subscribers("body_tracking_data") > 0 || this->count_subscribers("body_index_map/image_raw") > 0))
+	if (params_.body_tracking_enabled && k4abt_tracker_queue_size_ < 3)
         {
           if (!k4abt_tracker_.enqueue_capture(capture))
           {
@@ -1188,6 +1231,7 @@ void K4AROSDevice::bodyPublisherThread()
   {
     if (k4abt_tracker_queue_size_ > 0)
     {
+      frame_counter_++;
       k4abt::frame body_frame = k4abt_tracker_.pop_result();
       --k4abt_tracker_queue_size_;
 
@@ -1200,46 +1244,53 @@ void K4AROSDevice::bodyPublisherThread()
       else
       {
         auto capture_time = timestampToROS(body_frame.get_device_timestamp());
-        
-        if (this->count_subscribers("body_tracking_data") > 0)
+
+        // Joint marker array
+        MarkerArray::SharedPtr markerArrayPtr(new MarkerArray);
+        auto num_bodies = body_frame.get_num_bodies();
+        for (size_t i = 0; i < num_bodies; ++i)
         {
-          // Joint marker array
-          MarkerArray::SharedPtr markerArrayPtr(new MarkerArray);
-          auto num_bodies = body_frame.get_num_bodies();
-          for (size_t i = 0; i < num_bodies; ++i)
+          k4abt_body_t body = body_frame.get_body(i);
+          if (params_.save_legacy_log)
           {
-            k4abt_body_t body = body_frame.get_body(i);
-            for (int j = 0; j < (int) K4ABT_JOINT_COUNT; ++j)
+            legacy_log_stream_ << body.id << "," << std::to_string(body_frame.get_device_timestamp().count()) << "," <<
+                               std::to_string(duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) <<
+                               "," << frame_counter_;
+          }
+          for (int j = 0; j < (int) K4ABT_JOINT_COUNT; ++j)
+          {
+            Marker::SharedPtr markerPtr(new Marker);
+            getBodyMarker(body, markerPtr, j, capture_time);
+            markerArrayPtr->markers.push_back(*markerPtr);
+            if (params_.save_legacy_log)
             {
-              Marker::SharedPtr markerPtr(new Marker);
-              getBodyMarker(body, markerPtr, j, capture_time);
-              markerArrayPtr->markers.push_back(*markerPtr);
+              legacy_log_stream_ << "," << body.skeleton.joints[j].position.xyz.x << "," << body.skeleton.joints[j].position.xyz.y <<
+                                 "," << body.skeleton.joints[j].position.xyz.z << "," << confidence_level_map_[body.skeleton.joints[j].confidence_level];
             }
           }
-          body_marker_publisher_->publish(*markerArrayPtr);
+          if (params_.save_legacy_log)
+            legacy_log_stream_ << "\n";
         }
+        body_marker_publisher_->publish(*markerArrayPtr);
 
-        if (this->count_subscribers("body_index_map/image_raw") > 0)
+        // Body index map
+        Image::SharedPtr body_index_map_frame(new Image);
+        auto result = getBodyIndexMap(body_frame, body_index_map_frame);
+
+        if (result != K4A_RESULT_SUCCEEDED)
         {
-          // Body index map
-          Image::SharedPtr body_index_map_frame(new Image);
-          auto result = getBodyIndexMap(body_frame, body_index_map_frame);
+          RCLCPP_ERROR_STREAM(this->get_logger(),"Failed to get body index map");
+          rclcpp::shutdown();
+          return;
+        }
+        else if (result == K4A_RESULT_SUCCEEDED)
+        {
+          // Re-sychronize the timestamps with the capture timestamp
+          body_index_map_frame->header.stamp = capture_time;
+          body_index_map_frame->header.frame_id =
+              calibration_data_.tf_prefix_ + calibration_data_.depth_camera_frame_;
 
-          if (result != K4A_RESULT_SUCCEEDED)
-          {
-            RCLCPP_ERROR_STREAM(this->get_logger(),"Failed to get body index map");
-            rclcpp::shutdown();
-            return;
-          }
-          else if (result == K4A_RESULT_SUCCEEDED)
-          {
-            // Re-sychronize the timestamps with the capture timestamp
-            body_index_map_frame->header.stamp = capture_time;
-            body_index_map_frame->header.frame_id =
-                calibration_data_.tf_prefix_ + calibration_data_.depth_camera_frame_;
-
-            body_index_map_publisher_.publish(body_index_map_frame);
-          }
+          body_index_map_publisher_.publish(body_index_map_frame);
         }
       }
     }

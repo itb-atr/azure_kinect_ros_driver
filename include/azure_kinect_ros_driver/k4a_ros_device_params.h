@@ -32,6 +32,7 @@
 #define ROS_PARAM_LIST                                                                                                 \
   LIST_ENTRY(sensor_sn, "The serial number of the sensor this node should connect to.", std::string, std::string(""))  \
   LIST_ENTRY(depth_enabled, "True if depth camera should be enabled", bool, true)                                      \
+  LIST_ENTRY(save_legacy_log, "True if legacy log should be saved", bool, true)                                      \
   LIST_ENTRY(depth_unit, "Depth distance units. Options are: "+                                                        \
                          sensor_msgs::image_encodings::TYPE_32FC1+" (32 bit float metre) or "+                         \
                          sensor_msgs::image_encodings::TYPE_16UC1+" (16 bit integer millimetre)",                      \
