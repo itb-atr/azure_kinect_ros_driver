@@ -1253,8 +1253,10 @@ void K4AROSDevice::bodyPublisherThread()
           k4abt_body_t body = body_frame.get_body(i);
           if (params_.save_legacy_log)
           {
+            auto time = std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::system_clock::now());
+            std::string formated_timestamp = date::format("%Y-%m-%d_%H-%M-%S", time);
             legacy_log_stream_ << body.id << "," << std::to_string(body_frame.get_device_timestamp().count()) << "," <<
-                               std::to_string(duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count()) <<
+                               formated_timestamp <<
                                "," << frame_counter_;
           }
           for (int j = 0; j < (int) K4ABT_JOINT_COUNT; ++j)
@@ -1269,7 +1271,7 @@ void K4AROSDevice::bodyPublisherThread()
             }
           }
           if (params_.save_legacy_log)
-            legacy_log_stream_ << "\n";
+            legacy_log_stream_ << std::endl;
         }
         body_marker_publisher_->publish(*markerArrayPtr);
 

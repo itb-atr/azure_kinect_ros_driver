@@ -33,6 +33,8 @@
 //
 #include "azure_kinect_ros_driver/k4a_calibration_transform_data.h"
 #include "azure_kinect_ros_driver/k4a_ros_device_params.h"
+// Thanks to the developers of https://github.com/HowardHinnant/date for their library.
+#include "azure_kinect_ros_driver/date.h"
 
 #include <iostream>
 #include <fstream>
